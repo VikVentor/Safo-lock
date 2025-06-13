@@ -1,3 +1,9 @@
+/* Youtube: Ventoron
+   MakerWorld: Ventoron
+   Full Tutorial: instructables Safo-Lock
+*/
+
+
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
