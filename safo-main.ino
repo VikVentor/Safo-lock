@@ -2,6 +2,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Preferences.h>
+#include <ESP32Servo.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -11,9 +12,11 @@
 #define ENCODER_CLK 32
 #define ENCODER_DT  19
 #define ENCODER_SW  18
+#define SERVO_PIN   14
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Preferences prefs;
+Servo vaultServo;
 
 const int codeLength = 4;
 int correctCode[codeLength] = {5, 4, 7, 6};
@@ -40,6 +43,9 @@ void setup() {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(2);
+
+  vaultServo.attach(SERVO_PIN);
+  vaultServo.write(0); // Start locked
 
   prefs.begin("vault", false);
   for (int i = 0; i < codeLength; i++) {
@@ -93,6 +99,7 @@ void loop() {
         if (match) {
           vaultUnlocked = true;
           inMenu = true;
+          vaultServo.write(90);  // Unlock position
           showMenu();
         } else {
           showMessage("Wrong PIN\nTry Again");
@@ -105,6 +112,7 @@ void loop() {
     } else if (vaultUnlocked && inMenu) {
       if (!menuSelection) {
         showMessage("Locked");
+        vaultServo.write(0);  // Lock position
         delay(2000);
         currentIndex = 0;
         currentDigitValue = 0;
@@ -132,6 +140,7 @@ void loop() {
         }
         prefs.end();
         showMessage("PIN Saved\nVault Locked");
+        vaultServo.write(0);  // Lock position
         delay(2000);
         settingNewCode = false;
         currentIndex = 0;
@@ -154,6 +163,7 @@ void updateDisplay() {
     display.printf("NEW %d:\nDIGITS: %d", currentIndex + 1, currentDigitValue);
   } else if (vaultUnlocked && inMenu) {
     showMenu();
+    return;
   }
   display.display();
 }
