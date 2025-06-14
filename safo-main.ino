@@ -1,14 +1,10 @@
-/* Youtube: Ventoron
-   MakerWorld: Ventoron
-   Full Tutorial: instructables Safo-Lock
-*/
-
-
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Preferences.h>
 #include <ESP32Servo.h>
+#include <WiFi.h>
+#include <WebServer.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -37,6 +33,11 @@ bool inMenu = false;
 bool settingNewCode = false;
 bool menuSelection = false; // false = Lock, true = Set Password
 
+// Wi-Fi credentials
+const char* ssid = "ESP_SAFE_LOCK";
+const char* password = "12345678";
+WebServer server(80);
+
 void setup() {
   Serial.begin(115200);
 
@@ -61,9 +62,61 @@ void setup() {
 
   lastCLKState = digitalRead(ENCODER_CLK);
   showMessage("PIN 1:\nDIGITS:");
+
+  WiFi.softAP(ssid, password);
+  Serial.println("Access Point Started");
+  Serial.println(WiFi.softAPIP());
+
+  server.on("/", HTTP_GET, []() {
+    server.send(200, "text/html", "<html><body><h2>Reset Safe PIN</h2><form method='POST' action='/set'><label>Enter 4-digit PIN (0-9 each, space-separated):</label><br><br><input type='text' name='pin' placeholder='e.g. 1 2 3 4' required><br><br><input type='submit' value='Save'></form></body></html>");
+  });
+
+  server.on("/set", HTTP_POST, []() {
+    if (server.hasArg("pin")) {
+      String pinString = server.arg("pin");
+      pinString.trim();
+      int tempCode[4];
+      int count = 0;
+      bool valid = true;
+
+      int start = 0;
+      for (int i = 0; i < 4; i++) {
+        int spaceIndex = pinString.indexOf(' ', start);
+        if (spaceIndex == -1 && i < 3) {
+          valid = false;
+          break;
+        }
+        String part = (i < 3) ? pinString.substring(start, spaceIndex) : pinString.substring(start);
+        part.trim();
+        int val = part.toInt();
+        if (val < 0 || val > 9) {
+          valid = false;
+          break;
+        }
+        tempCode[i] = val;
+        start = spaceIndex + 1;
+      }
+
+      if (valid) {
+        prefs.begin("vault", false);
+        for (int i = 0; i < 4; i++) {
+          correctCode[i] = tempCode[i];
+          prefs.putInt(("d" + String(i)).c_str(), tempCode[i]);
+        }
+        prefs.end();
+        server.send(200, "text/html", "<html><body><h2>PIN Updated!</h2><a href='/'>Go Back</a></body></html>");
+      } else {
+        server.send(400, "text/html", "<html><body><h2>Invalid PIN Format. Use 4 numbers (0-9) separated by spaces.</h2><a href='/'>Try Again</a></body></html>");
+      }
+    }
+  });
+
+  server.begin();
 }
 
 void loop() {
+  server.handleClient();
+
   int newCLKState = digitalRead(ENCODER_CLK);
 
   if (lastCLKState == HIGH && newCLKState == LOW) {
@@ -78,7 +131,7 @@ void loop() {
       else currentDigitValue--;
     }
     if (currentDigitValue < 0) currentDigitValue = 0;
-    if (currentDigitValue > 99) currentDigitValue = 99;
+    if (currentDigitValue > 9) currentDigitValue = 9;
     updateDisplay();
   }
 
