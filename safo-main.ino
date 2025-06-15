@@ -21,7 +21,7 @@ Preferences prefs;
 Servo vaultServo;
 
 const int codeLength = 4;
-int correctCode[codeLength] = {5, 4, 7, 6};
+int correctCode[codeLength] = {1, 1, 2, 2};
 int enteredCode[codeLength] = {0};
 
 int currentDigitValue = 0;
